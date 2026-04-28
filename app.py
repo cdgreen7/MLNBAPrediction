@@ -107,6 +107,96 @@ hr { border-color: #1E293B !important; }
 </style>
 """, unsafe_allow_html=True)
 
+# ── TEAM NAME MAPPING ───────────────────────────────────────────────────────
+# Map all historical team names to current 30 NBA teams
+TEAM_NAME_MAPPING = {
+    # Atlanta Hawks (from St. Louis Hawks, Milwaukee Hawks)
+    'St. Louis Hawks': 'Atlanta Hawks',
+    'Milwaukee Hawks': 'Atlanta Hawks',
+
+    # Brooklyn Nets (from New Jersey Nets)
+    'New Jersey Nets': 'Brooklyn Nets',
+    'New York Nets': 'Brooklyn Nets',
+    
+    # Charlotte Hornets (from Charlotte Bobcats - the Bobcats became the Hornets in 2014)
+    'Charlotte Bobcats': 'Charlotte Hornets',
+    
+    # Chicago Bulls (from Chicago Packers, Chicago Zephyrs)
+    'Chicago Packers': 'Chicago Bulls',
+    'Chicago Zephyrs': 'Chicago Bulls',
+    
+    # Detroit Pistons (from Ft. Wayne Zollner Pistons)
+    'Ft. Wayne Zollner Pistons': 'Detroit Pistons',
+    
+    # Golden State Warriors (from Philadelphia Warriors, San Francisco Warriors)
+    'Philadelphia Warriors': 'Golden State Warriors',
+    'San Francisco Warriors': 'Golden State Warriors',
+    
+    # Houston Rockets (from San Diego Rockets)
+    'San Diego Rockets': 'Houston Rockets',
+    
+    
+    # LA Clippers (from San Diego Clippers, LA Clippers)
+    'San Diego Clippers': 'Los Angeles Clippers',
+    'LA Clippers': 'Los Angeles Clippers',
+    
+    # Los Angeles Lakers (from Minneapolis Lakers)
+    'Minneapolis Lakers': 'Los Angeles Lakers',
+    
+    # Memphis Grizzlies (from Vancouver Grizzlies)
+    'Vancouver Grizzlies': 'Memphis Grizzlies',
+    
+    # New Orleans Pelicans (from New Orleans Hornets - Hornets moved to OKC temporarily, then became Pelicans)
+    'New Orleans Hornets': 'New Orleans Pelicans',
+    'Oklahoma City Hornets': 'New Orleans Pelicans',
+
+    
+    # Oklahoma City Thunder (from Seattle SuperSonics)
+    'Seattle SuperSonics': 'Oklahoma City Thunder',
+    
+
+    
+    # Philadelphia 76ers (from Syracuse Nationals)
+    'Syracuse Nationals': 'Philadelphia 76ers',
+    
+    # Sacramento Kings (from Cincinnati Royals, Kansas City Kings, Kansas City-Omaha Kings)
+    'Cincinnati Royals': 'Sacramento Kings',
+    'Kansas City Kings': 'Sacramento Kings',
+    'Kansas City-Omaha Kings': 'Sacramento Kings',
+    
+    # Utah Jazz (from New Orleans Jazz)
+    'New Orleans Jazz': 'Utah Jazz',
+    
+    # Washington Wizards (from Baltimore Bullets, Capital Bullets, Washington Bullets)
+    'Baltimore Bullets': 'Washington Wizards',
+    'Capital Bullets': 'Washington Wizards',
+    'Washington Bullets': 'Washington Wizards',
+    
+}
+
+# Current 30 NBA teams
+CURRENT_NBA_TEAMS = {
+    'Atlanta Hawks', 'Boston Celtics', 'Brooklyn Nets', 'Charlotte Hornets',
+    'Chicago Bulls', 'Cleveland Cavaliers', 'Dallas Mavericks', 'Denver Nuggets',
+    'Detroit Pistons', 'Golden State Warriors', 'Houston Rockets', 'Indiana Pacers',
+    'Los Angeles Clippers', 'Los Angeles Lakers', 'Memphis Grizzlies', 'Miami Heat',
+    'Milwaukee Bucks', 'Minnesota Timberwolves', 'New Orleans Pelicans', 'New York Knicks',
+    'Oklahoma City Thunder', 'Orlando Magic', 'Philadelphia 76ers', 'Phoenix Suns',
+    'Portland Trail Blazers', 'Sacramento Kings', 'San Antonio Spurs', 'Toronto Raptors',
+    'Utah Jazz', 'Washington Wizards'
+}
+
+def normalize_team_name(team_name):
+    """Map historical team names to current NBA team names."""
+    if pd.isna(team_name) or not team_name or team_name.strip() == '':
+        return None
+    team_name = team_name.strip()
+    return TEAM_NAME_MAPPING.get(team_name, team_name)
+
+def is_current_nba_team(team_name):
+    """Check if a team name is one of the current 30 NBA teams."""
+    return team_name in CURRENT_NBA_TEAMS
+
 # ── DATA LOADING ─────────────────────────────────────────────────────────────
 @st.cache_data(show_spinner=False)
 def load_and_prepare_data():
@@ -117,8 +207,17 @@ def load_and_prepare_data():
     games = games[games['gameType'] == 'Regular Season'].reset_index(drop=True)
     games = games[games['gameDateTimeEst'].dt.year >= 2000].reset_index(drop=True)
     games['home_win'] = (games['winner'] == games['hometeamId']).astype(int)
-    games['home_team'] = games['hometeamCity'] + ' ' + games['hometeamName']
-    games['away_team'] = games['awayteamCity'] + ' ' + games['awayteamName']
+    games['home_team'] = games['hometeamCity'].fillna('') + ' ' + games['hometeamName'].fillna('')
+    games['away_team'] = games['awayteamCity'].fillna('') + ' ' + games['awayteamName'].fillna('')
+    
+    # Normalize team names to current NBA teams
+    games['home_team'] = games['home_team'].apply(normalize_team_name)
+    games['away_team'] = games['away_team'].apply(normalize_team_name)
+    
+    # Filter out non-current NBA teams and invalid entries
+    games = games[games['home_team'].apply(is_current_nba_team)]
+    games = games[games['away_team'].apply(is_current_nba_team)]
+    games = games.reset_index(drop=True)
 
     # Team games reshape
     home = games[['gameId','gameDateTimeEst','home_team','homeScore','awayScore','home_win']].copy()
